@@ -188,21 +188,29 @@ class HX1230_FB_SPI(HX1230_FB):
 
     def _spi_write_many(self, dc, value):
         # for each 8 bytes, send 9 bytes (incl a DC bit for each)
-        for i in range(0, len(value), 8):
-            block = value[i:i+8]
-            cmd = bytearray(9)
-            l = len(block)
-            for j in range(l):
-                if dc:
-                    cmd[j] |= (1 << (7-j))  # DC bit
-                if j == 7:
-                    cmd[j+1] = block[j]  # DC on prev 7th byte means this one is no change
-                else:
-                    cmd[j] |= block[j] >> (j+1)
-                    cmd[j+1] |= (block[j] << (7-j)) & 0xff
+#        out = bytearray(len(value)*(9//8+1))
+        out=bytearray(9)
+        pos=0
+        if (dc):
             self.cs(0)
-            self.spi.write(cmd if l == 8 else cmd[0:l+1])
+            for i in range(0, len(value), 8):
+                block = value[i:i+8]
+                out[pos]=0x80|(block[0]>>1)
+                out[pos+1]=block[0]<<7|0x40|block[1]>>2
+                out[pos+2]=block[1]<<6|0x20|block[2]>>3
+                out[pos+3]=block[2]<<5|0x10|block[3]>>4
+                out[pos+4]=block[3]<<4|0x08|block[4]>>5
+                out[pos+5]=block[4]<<3|0x04|block[5]>>6
+                out[pos+6]=block[5]<<2|0x02|block[6]>>7
+                out[pos+7]=block[6]<<1|0x01
+                out[pos+8]=block[7]
+                #pos+=9
+                self.spi.write(out)
             self.cs(1)
+        else:
+            #not worth optimizing the (currently unused) case of sending many commands
+            for val in value:
+                self._spi_write_one(dc,val)
 
 
 class HX1230_FB_BBSPI(HX1230_FB):
